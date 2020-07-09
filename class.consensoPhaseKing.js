@@ -4,7 +4,6 @@ module.exports =  class phaseKing {
         this._arrayProcessos = [];
         this._arrayRecebidoPphase = [];
         this._objJsonDesteProcesso = new Object();
-        // console.log('entrou no constructor!')
     }
 
 
@@ -36,14 +35,13 @@ module.exports =  class phaseKing {
 
         for (let phase = 1; phase <= f + 1; phase++){
             //ROUND 1
-            // a inicialização de "v " foi realizada no início do método
-            //verificando a majority (o valor que aparece mais do que n/2 vezes nas msgs recebidas)
+            //A inicialização de "v " foi realizada no início do método
+            //Verificando a majority (o valor que aparece mais do que n/2 vezes nas msgs recebidas)
             //objeto : majority.mensagem    e    majority.mult
-            //note que aqui tenho v <-- majority
             majority = this.verifyMajority(v);
             
             //ROUND 2
-            //se o processo é KING da vez, vai enviar para todos o seu majority
+            //se o processo é KING (lider) do round, vai enviar para todos o seu majority
             if (i == phase){
                 // console.log (`* (class.consensoPhaseKing.js) entrou no if i == phase ->  ${i} == ${phase}`);
                 //retornar o majority para multicast!
@@ -51,19 +49,6 @@ module.exports =  class phaseKing {
                 return majority;
             }
             
-            //verificar se recebeu o tiebreaker do Pphase (receive tie-breaker)
-            // if (v[0].msgFromPhaseKing){
-            //     console.log (`* (class.consensoPhaseKing.js) entrou no if msgFromPhaseKing ->  ${v[0].msgFromPhaseKing} `);
-            //     //se o mult já é maioria retornamos o majority encontrado
-            //     if (mult > n/2 ){ //ALTERAÇÃO DA LINHA 1K CONFORME INFORMAÇÃO DO TEAMS
-            //         //nada acontece ... nao vou retornar agora pois isso sera feito no final
-            //         //return majority;
-            //     //se o mult NÃO é maioria, o valor do majority recebe o tie-breaker
-            //     }else{
-            //         majority.mensagem = v[0].mensagem
-            //     }
-            // }
-
             //verificação para todos que venham do phaseKing
             if (mult > n/2 && v[0].msgFromPhaseKing){
                 majority = this.verifyMajority(v); 
@@ -71,7 +56,7 @@ module.exports =  class phaseKing {
                 majority.mensagem = v[0].mensagem
             }
 
-            //return do ROUND2 apenas se:
+            //retorno do ROUND2 apenas se:
             if (phase == f + 1){
                 console.log(`* (class.consensoPhaseKing.js) Tie-Breaker PHK Round2 [VALOR=>>> ${majority.mensagem}, MULT=>> ${majority.mult}  ]`);
                 return majority;

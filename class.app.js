@@ -5,13 +5,11 @@ var udpServer = dgram.createSocket('udp4'); //vou usar o createSocket com a bibl
 
 //arquivos das minhas classes
 var phaseKing = require('./class.consensoPhaseKing');
-const metodosAux = require('./class.consensoMetodosAuxiliares');
 
 //DECLARAR OS OBJETOS COMO GLOBAIS PARA:
 //classe com os metodos para o phaseKing
 var consensoPHK = new phaseKing();
-//classe com métodos para tratamento de strings
-var auxiliares = new metodosAux();
+//variáveis globais
 var tieBreakerProc1 = false;
 var tieBreakerProc2 = false;
 
@@ -30,6 +28,11 @@ module.exports = class classApp1{
         this._mensagemValorFinal = 100; 
     }
 
+    getArrayProcessos(){
+        return this._arrayProcessos;
+    }
+
+
     //encode - bem simples: msg + privKey +
     encodeMsg(msg, privKey){
         return msg + privKey;
@@ -40,11 +43,6 @@ module.exports = class classApp1{
         return msg - pubKey;
     }
 
-
-    //getters
-    getArrayProcessos(){
-        return this._arrayProcessos;
-    }
 
     //print dos atributos publicos
     printPublicVarMsg(){
@@ -61,42 +59,37 @@ module.exports = class classApp1{
             novoItem.mensagem = this.decodeMsg(novoItem.mensagem, novoItem.publicKey);
         }
         this._arrayProcessos.push(novoItem);
-        //verificando o tamanho do arrayProcessos
-        // for(let item of this._arrayProcessos){
-        //     console.log(`* (class.app.js) arrayProcessos(APÓS PUSH) -> ${item.nrProc}, ${item.publicKey}, ${item.mensagem}, ${item.msgFromPhaseKing}, ${item.mult}`);
-        // }
     }
+
     //inicializar listen processo 
     async startListen (){
         var portasProc = [this._porta]; //este array define em quais portas este processo vai escutar
         let selfNrProc = this._objJsonEnviar.nrProc;
-        // console.log('* (class.app.js) objJsonEnviar INICIO START LISTEN->', this._objJsonEnviar);
         //iniciando o listen na(s) porta(s) especificadas
-        //obs: arrow function pois elas não sofrem o BIND, ou seja, mantém o contexto do  "this.xxxx" se referindo a classe!!
-        portasProc.forEach(port => {      //desta forma para cada porta que está no array eu ...
-            // console.log('* (class.app.js) objJsonEnviar DENTRO DO PORTASPROC FOR EACH->', this._objJsonEnviar);
-            udpServer.bind(port,'127.0.0.1')            //e com o bind indico que no localhost (127.0.0.1) na porta xx vou ficar escutando
-            //este é o meu callback... o udpServer.on indica que o listening está ligado ... 
+
+        portasProc.forEach(port => {      //começa o LISTEN em cada uma das portas do array portasProc
+            udpServer.bind(port,'127.0.0.1')      //o bind indica que no localhost (127.0.0.1) na porta XXXX para listen
+            //callback do udpServer.on - ativa o  listening  
             //o listening se refere ao buffer e, sempre que chegar uma msg, ele vai parar e executar o callback
             udpServer.on('listening', function() {
                 var address = udpServer.address()
                 console.log(`\n * (class.app.js)  Proc ${selfNrProc} : REST na porta->  ${address.address}  :   ${address.port}`)
             });
 
-            //habilitando também o recebimento de mensagens ... sempre usando callback ARROW FUNCTION pra não alterar o contexto do "this.""
+            //habilitando também o recebimento de mensagens ...
             udpServer.on('message', async (msg, rinfo) => {
-                // console.log('* (class.app.js) objJsonEnviar NO UDPSERVER->', this._objJsonEnviar);
                 console.log(" ===> (class.app.js) Mensagem recebida: "+ msg +" IP "+rinfo.address+ " : "+ rinfo.port )
                 //convertendo a mensagem para objeto Json:
                 var arrayMsgsRecebidas = JSON.parse(msg);
 
-                //decodificando as mensagens recebidas / VERIFICA ASSINATURA DIGITAL
+                //decodificando as mensagens recebidas
+                //Neste contexto é realizada a verificação de "assinatura digital", pois junto com a mensagem é enviada a public key e desta forma o receptor consegue 
+                //conferir quem foi o remetente
                 for (msg of arrayMsgsRecebidas){
-                    //somente vou fazer decode se a msg >=  11 (que , na minha logica, é o valor mínimo que uma msg encoded vai ter!!)
+                    //somente vou fazer decode se a msg >=  11 (que , na logica implementada, é o valor mínimo que uma msg encoded vai ter!!)
                     if (msg.mensagem >= 11 ){
-                        // let msgTemp = msg;
                         msg.mensagem = this.decodeMsg(msg.mensagem, msg.publicKey);
-                        //mensagem confirmando assinatura digital
+                        //confirmando assinatura digital
                         if (msg.publicKey == msg.nrProc * 11 && (msg.mensagem == 1 || msg.mensagem == 0 )){
                             console.log(` \n *** (class.app.js) - pubKey (${msg.publicKey})+ nrProc (${msg.nrProc}): OK --> ASSINATURA CONFIRMADA`);
                         }else{
@@ -112,7 +105,6 @@ module.exports = class classApp1{
                 var selfObjJsonEnviar = this._objJsonEnviar; //No loop "for..of" abaixo ele altera o contexto do "this." . Por isso criamos uma nova var
                 var selfArrayProcessos = this._arrayProcessos;
                 
-
                 //PRIMEIRA VERIFICAÇÃO: SE A MENSAGEM RECEBIDA É TIE-BREAKER (DO PHASE KING)
                 if (arrayMsgsRecebidas[0].msgFromPhaseKing){
                     console.log(`-------------------------------`);
@@ -150,8 +142,6 @@ module.exports = class classApp1{
                 }else{
                     //preciso saber se a mensagem do proprio processo já está no arrayMsgsRecebidas
                     for (let procVerificar of arrayMsgsRecebidas){
-                        // console.log('* (class.app.js) procVerificar-> ' + procVerificar.nrProc )
-                        // console.log('* (class.app.js) objJsonEnviar NO FOR ... OF->', selfObjJsonEnviar);
                         if (procVerificar.nrProc == selfObjJsonEnviar.nrProc){
                             minhaMsgOK = true;
                         }
@@ -166,10 +156,6 @@ module.exports = class classApp1{
                     for (let msgDaVez of arrayMsgsRecebidas){
                         console.log(`* (class.app.js) arrayMsgsRecebidas[]->  ${msgDaVez.nrProc}, ${msgDaVez.publicKey}, ${msgDaVez.mensagem}, ${msgDaVez.msgFromPhaseKing}, ${msgDaVez.mult}`);
                     }
-                    //verificando o tamanho do arrayProcessos
-                    // for(let item of selfArrayProcessos){
-                    //     console.log(`* (class.app.js) arrayProcessos(local) [nrPrc ->> ${item.nrProc}, pk ->> ${item.publicKey}, msg ->> ${item.mensagem}, fromPHK ->> ${item.msgFromPhaseKing}, mult->> ${item.mult} ]`);
-                    // }
 
                     //varrendo o arrayMsgsRecebidas (verificar se ainda existe alguma que veio que não tenho no arrayProcessos)
                     let msgDaVezJaExiste = false;
@@ -189,8 +175,8 @@ module.exports = class classApp1{
                         }
                     }
 
-                    //CASO EU TENHA INCLUÍDO UMA NOVA MSG no meu arrayProcessos (multicastArrayProcessos == true), 
-                    //vou enviá-lo no meu multicast (para todos os processos verificarem se podem incluir algo no seu próprio array de processos)
+                    //CASO EU TENHA INCLUÍDO UMA NOVA MSG no arrayProcessos (multicastArrayProcessos == true), 
+                    //vou enviá-lo no multicast (para todos os processos verificarem se podem incluir algo no seu próprio array de processos)
                     if (multicastArrayProcessos){
                         await this.sendAllSocketMessage();
                         console.log(' * (class.app.js) MULTICAST - arrayProcessos enviado para membros...')                 
@@ -200,15 +186,9 @@ module.exports = class classApp1{
                     // PHASE-KING: caso meu arrayProcessos tenha um tamanho == 5 vamos executar o phaseKing
                     if (selfArrayProcessos.length == 5){
                         console.log (`\n  * (class.app.js) >>>> PHASE-KING <<<<< todos os processos ativos :  Verificando... `);
-                        //antes de passar o selfArrayProcessos para o PHK, vamos verificar se ainda existe alguma msg codificada! e decode ela
-                        //faço isso pois a msg do próprio processo (OWN) foi incluída no constructor já usando encoded
+                        //antes de passar o selfArrayProcessos para o PHK, vamos verificar se ainda existe alguma msg codificada! E fazer o decode se houver
+                        //faço isso pois a msg do próprio processo foi incluída no constructor já usando encoded
                         selfArrayProcessos = await this.decodeArrayProc(selfArrayProcessos);
-                        // for (let item of selfArrayProcessos){
-                        //     if (item.mensagem >= 11){
-                        //         item.mensagem = this.decodeMsg(item.mensagem, item.publicKey);
-                        //     }
-                        // }
-
                         //setando o arrayProcessos para o  phaseKing
                         consensoPHK.setArrayProcessos(selfArrayProcessos);
                         //setando o objeto json enviado por este processo
@@ -216,14 +196,12 @@ module.exports = class classApp1{
                         //executando o consenso do Phase-King : o majority já é um objeto pronto para enviar caso o processo seja King
                         majority = consensoPHK.phaseKingConsensus();
 
-                        //caso a resposta tenha sido uma msgFromPhaseKing == true AND ttl == 1 :  multicast ela para todos
+                        //caso a resposta tenha sido uma msgFromPhaseKing == true : enviar ela para todos
                         if (majority.msgFromPhaseKing){
                             console.log(`\n * (class.app.js) >>>> Este é o Phase King:`);
-                            // console.log (`* (class.app.js) >>>> Majority : multicast TO ALL--> ${majority.nrProc}, ${majority.publicKey}, ${majority.mensagem}, ${majority.msgFromPhaseKing}, ${majority.mult}`);
                             console.log(`* (class.app.js) TIE-BREAKER ENVIADO -> NrProc KING[${majority.nrProc}], PubKey [${majority.publicKey}], Mensagem [${majority.mensagem}], FromPHK [${majority.msgFromPhaseKing}], Mult [${majority.mult}]`);
                             console.log(`* (class.app.js) Mensagem Inicial -> ${this._arrayProcessos[0].mensagem}`)
                             await this.sendAllSocketMessage([majority]);
-                            // this.sendAlgumasMsgs([majority]);
                         }
                         console.log (`\n  * (class.app.js) >>>> PHASE-KING ... FIM!! <<<<<`);
 
@@ -243,7 +221,7 @@ module.exports = class classApp1{
             //caso contrario a mensagem é um array bruto... vou converter para string!
             mensagem = JSON.stringify(mensagem);
         }
-        // console.log('* (class.app1.js) arrayPortas-->', this._arrayPortas);
+
         //enviando todo o meu array no buffer (multicast para todos os membros do grupo)
         for (let portaDaVez of this._arrayPortas){
             if (portaDaVez != this._porta){
@@ -251,17 +229,6 @@ module.exports = class classApp1{
             }
         }
      }
-
-    //[NÃO UTILIZO] enviar mensagem inicial (ou seja: envia o arrayProcessos deste app ou um array informado - inclusive as msgs com chaves públicas)
-    async sendAlgumasMsgs(mensagem){
-        mensagem = JSON.stringify(mensagem);
-        // console.log('* (class.app1.js) arrayPortas-->', this._arrayPortas);
-        //enviando todo o meu array no buffer (multicast para todos os membros do grupo)
-        udpServer.send(Buffer.from(mensagem), 3061, 'localhost');
-        // udpServer.send(Buffer.from(mensagem), 3062, 'localhost');
-        udpServer.send(Buffer.from(mensagem), 3063, 'localhost');
-
-        }
 
     //enviar mensagem apenas para o acompanhaConsensoMulticast.js (não estou mais usando)
     sendMessage (){
